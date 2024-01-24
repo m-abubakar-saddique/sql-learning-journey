@@ -59,3 +59,93 @@ SUBSTRING(email from POSITION('.' in email)-1 for 3) ||
 '***' 
 || SUBSTRING(email from POSITION('@' in email))
 from public.customer
+
+
+-- You need to analyze the payments and find out the following:
+-- What's the month with the highest total payment amount?
+-- What's the day of week with the highest total payment amount?
+-- (0 is Sunday)
+-- What's the highest amount one customer has spent in a week?
+
+SELECT
+EXTRACT(month from payment_date) AS Month,
+SUM(amount) AS total_payment_amount
+FROM public.payment
+GROUP BY EXTRACT(month from payment_date)
+ORDER by SUM(amount) DESC
+LIMIT 2
+
+SELECT
+EXTRACT(DOW from payment_date) AS Day_Of_Week,
+SUM(amount) AS total_payment_amount
+FROM public.payment
+GROUP BY EXTRACT(DOW from payment_date)
+ORDER by SUM(amount) DESC
+LIMIT 2
+
+SELECT
+customer_id,
+EXTRACT(WEEK from payment_date) AS Week,
+SUM(amount) AS total_payment_amount
+FROM public.payment
+GROUP BY customer_id,
+EXTRACT(WEEK from payment_date)
+ORDER BY SUM(amount) DESC
+LIMIT 2
+
+
+-- You need to sum payments and group in the following formats:
+SELECT 
+SUM(amount) AS total_payment,
+TO_CHAR (payment_date, 'Dy, DD/MM/YYYY') as day
+FROM payment
+GROUP BY day
+ORDER BY total_payment DESC
+
+SELECT 
+SUM(amount) AS total_payment,
+TO_CHAR (payment_date, 'Mon, YYYY') as mon_year
+FROM payment
+GROUP BY mon_year
+ORDER BY total_payment DESC
+
+SELECT 
+SUM(amount) AS total_payment,
+TO_CHAR (payment_date, 'Dy, HH:MI') as Day_time
+FROM payment
+GROUP BY Day_time
+ORDER BY total_payment DESC
+
+
+-- You need to create a list for the suppcity team of all rental
+-- durations of customer with customer_id 35.
+-- Also you need to find out for the suppcity team
+-- which customer has the longest average rental duration?
+SELECT
+return_date-rental_date AS rental_duration,
+customer_id
+FROM public.rental
+WHERE customer_id = 35
+
+SELECT
+AVG(return_date-rental_date) AS avg_rental_duration,
+customer_id
+FROM public.rental
+GROUP BY customer_id
+ORDER BY avg_rental_duration DESC
+
+
+-- Your manager is thinking about increasing the prices for films
+-- that are more expensive to replace.
+-- For that reason, you should create a list of the films including the
+-- relation of rental rate / replacement cost where the rental rate
+-- is less than 4% of the replacement cost.
+-- Create a list of that film_ids together with the percentage rounded
+-- to 2 decimal places. For example 3.54 (=3.54%).
+
+SELECT 
+title,
+ROUND(rental_rate / replacement_cost*100, 2) AS percentage
+FROM public.film
+WHERE ROUND(rental_rate / replacement_cost*100, 2) < 4
+ORDER BY 2 DESC
