@@ -132,3 +132,221 @@ mng.first_name ||' '|| mng.last_name AS manager_name
 FROM employees emp
 LEFT JOIN employees mng
 ON emp.manager_id=mng.emp_id;
+
+
+-- Task 5.2
+-- Create a view called v_employees_info from that previous query.
+CREATE VIEW v_employees_info
+AS
+SELECT 
+emp.*,
+CASE WHEN emp.end_date IS NULL THEN 'true'
+ELSE 'false' 
+END as is_active,
+mng.first_name ||' '|| mng.last_name AS manager_name
+FROM employees emp
+LEFT JOIN employees mng
+ON emp.manager_id=mng.emp_id;
+
+
+-- Task 6
+-- Write a query that returns the average salaries for each positions with appropriate roundings.
+-- Question:
+-- What is the average salary for a Software Engineer in the company.
+SELECT 
+position_title,
+ROUND(AVG(salary),2)
+FROM v_employees_info
+GROUP BY position_title
+ORDER BY 2;
+
+
+-- Task 7
+-- Write a query that returns the average salaries per division.
+-- Question:
+-- What is the average salary in the Sales department?
+SELECT 
+division,
+ROUND(AVG(salary),2)
+FROM employees e
+LEFT JOIN departments d 
+ON e.department_id=d.department_id
+GROUP BY division
+ORDER BY 2 
+
+
+
+-- Task 8.1
+-- Write a query that returns the following:
+-- emp_id,
+-- first_name,
+-- last_name,
+-- position_title,
+-- salary
+-- and a column that returns the average salary for every job_position.
+-- Order the results by the emp_id.
+SELECT emp_id,
+first_name,
+last_name,
+position_title,
+salary,
+ROUND(AVG(salary) OVER(PARTITION BY position_title),2) avg_position_sal
+FROM employees
+ORDER BY emp_id
+
+
+-- Task 8.2
+-- Difficulty: Advanced to Pro
+-- How many people earn less than there avg_position_salary?
+-- Write a query that answers that question.
+-- Ideally, the output just shows that number directly.
+SELECT COUNT(*) FROM
+(SELECT 
+salary,
+AVG(salary) OVER(PARTITION BY position_title) avg_position_sal
+FROM employees
+ORDER BY emp_id)
+WHERE salary < avg_position_sal
+
+
+-- Task 9:
+-- Difficulty: Advanced
+-- Write a query that returns a running total of the salary development ordered by the start_date.
+-- In your calculation, you can assume their salary has not changed over time, and you can disregard the fact that people have left the company (write the query as if they were still working for the company).
+-- Question:
+-- What was the total salary after 2018-12-31?
+SELECT 
+emp_id,
+salary,
+start_date,
+SUM(salary) OVER(ORDER BY start_date) as salary_totals
+FROM employees;
+
+
+-- Task 10:
+-- Create the same running total but now also consider the fact that people were leaving the company.
+-- Question:
+-- What was the total salary after 2018-12-31?
+SELECT 
+start_date,
+SUM(salary) OVER(ORDER BY start_date)
+FROM (
+SELECT 
+emp_id,
+salary,
+start_date
+FROM employees
+UNION 
+SELECT 
+emp_id,
+-salary,
+end_date
+FROM v_employees_info
+WHERE is_active ='false'
+ORDER BY start_date) a 
+
+
+-- Task 11.1 & Task 11.2
+-- Write a query that outputs only the top earner per position_title including first_name and position_title and their salary.
+-- Question:
+-- What is the top earner with the position_title SQL Analyst?
+SELECT first_name, position_title, salary, avg_salary_position_title
+FROM
+(SELECT *,
+RANK() OVER (PARTITION BY position_title ORDER BY salary DESC) as rank_in_position_title,
+ROUND(AVG(salary) OVER (PARTITION BY position_title), 2) as avg_salary_position_title
+FROM employees
+ORDER BY position_title
+)
+WHERE rank_in_position_title = 1
+ORDER BY salary DESC
+
+
+-- Task 11.3
+-- Remove those employees from the output of the previous query that has the same salary as the average of their position_title.
+-- These are the people that are the only ones with their position_title.
+
+SELECT first_name, position_title, salary, avg_salary_position_title
+FROM
+(SELECT *,
+RANK() OVER (PARTITION BY position_title ORDER BY salary DESC) as rank_in_position_title,
+ROUND(AVG(salary) OVER (PARTITION BY position_title), 2) as avg_salary_position_title
+FROM employees
+ORDER BY position_title
+)
+WHERE rank_in_position_title = 1
+AND salary = avg_salary_position_title
+ORDER BY salary DESC
+
+-- OR
+
+SELECT
+first_name,
+position_title,
+salary,
+(SELECT ROUND(AVG(salary),2) as avg_in_pos FROM employees e3
+WHERE e1.position_title=e3.position_title)
+FROM employees e1
+WHERE salary = (SELECT MAX(salary)
+			   FROM employees e2
+			   WHERE e1.position_title=e2.position_title)
+AND salary<>(SELECT ROUND(AVG(salary),2) as avg_in_pos FROM employees e3
+WHERE e1.position_title=e3.position_title)
+
+
+-- Task 12
+-- Write a query that returns all meaningful aggregations of
+-- - sum of salary,
+-- - number of employees,
+-- - average salary
+-- grouped by all meaningful combinations of
+-- - division,
+-- - department,
+-- - position_title.
+-- Consider the levels of hierarchies in a meaningful way.
+SELECT division,
+department,
+position_title,
+SUM(salary),
+COUNT(emp_id),
+ROUND(AVG(salary),2)
+FROM employees
+NATURAL JOIN departments
+GROUP BY
+	ROLLUP (division,
+			department,
+			position_title
+	) 
+ORDER BY 1,2,3
+
+
+-- Task 13
+-- Write a query that returns all employees (emp_id) including their position_title, department, their salary, and the rank of that salary partitioned by department.
+-- The highest salary per division should have rank 1.
+-- Question:
+-- Which employee (emp_id) is in rank 7 in the department Analytics?
+SELECT emp_id,
+position_title,
+department,
+salary,
+RANK() OVER(PARTITION BY department ORDER BY salary DESC)
+FROM employees
+NATURAL JOIN departments
+
+
+-- Task 14
+-- Write a query that returns only the top earner of each department including
+-- their emp_id, position_title, department, and their salary.
+-- Question:
+-- Which employee (emp_id) is the top earner in the department Finance?
+SELECT * FROM
+(
+SELECT
+emp_id,
+position_title,
+department,
+salary,
+RANK() OVER(PARTITION BY department ORDER BY salary DESC)
+FROM employees
+NATURAL LEFT JOIN departments) a
+WHERE rank=1
